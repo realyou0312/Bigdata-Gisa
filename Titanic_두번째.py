@@ -28,7 +28,7 @@ full_data = [train, test]
 
 print(train.info())
 
-# Pclass
+# Pclass 
 
 print(train[['Pclass', 'Survived']].groupby(['Pclass'], as_index=False).mean())
 
