@@ -162,4 +162,4 @@ test = pd.read_csv('test.csv')
 results = pd.concat([test.PassengerId, test_result2],axis=1) # 왜 array?
 print(results.head(3))
 
-results.to_csv("Submission.csv", index=False)
+results.to_csv("Submission.csv", index=False) 
