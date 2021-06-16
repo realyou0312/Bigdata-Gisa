@@ -12,116 +12,171 @@ sdf = pd.DataFrame(df_scaler, columns= data.columns, index= data.index)
 print(len(sdf['qsec'][sdf['qsec']>0.5]))
 
 #문제 2------------------------------------------------------------------------------------------------------------------
+# 출력을 원하실 경우 print() 활용
+# 예) print(df.head())
+
+# 답안 제출 예시
+# 수험번호.csv 생성
+# DataFrame.to_csv("0000.csv", index=False)
+
 import pandas as pd
 import numpy as np
-from scipy.stats import skew
-import warnings
 
-warnings.filterwarnings(action='ignore')
 
-# 모델 관련 라이브러리
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.model_selection import train_test_split
-# 모델들_분류알고리즘
-from sklearn import svm
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.neighbors import KNeighborsClassifier
-# 평가지표
-from sklearn.metrics import roc_auc_score, accuracy_score, confusion_matrix, precision_score, recall_score, f1_score, \
-    roc_curve
-# 초매개변수 최적화
-from sklearn.model_selection import GridSearchCV, cross_val_score, KFold, cross_validate
-# 앙상블
-from sklearn.ensemble import VotingClassifier
-
-# 데이터 불러오기
-train_X = pd.read_csv("data/X_train.csv")
-train_y = pd.read_csv("data/y_train.csv")
+X = pd.read_csv("data/X_train.csv")
+y = pd.read_csv("data/y_train.csv")
 test = pd.read_csv("data/X_test.csv")
-train = pd.merge(train_X, train_y, left_on='cust_id', right_on='cust_id', how='inner')
-train_test = pd.concat([train, test])
+train = X.merge(y,how="outer", on= "cust_id")
 
-#창보기 설정
-pd.set_option("display.max_columns", 10)
-pd.set_option("display.max_rows", 100)
-
-# --shape, head, info
-# print(train.shape, train.head())
-print(train_test.info())
-
-# print(test.shape, test.head())
+#shape, head, info
+# print(train.shape, test.shape)
+# print(train.info())
 # print(test.info())
 
+###결측치 -- 환불금액
 
-# 데이터 전처리
-numeric_feats = train_test.dtypes[train_test.dtypes != 'object'].index
-obj_feats = train_test.dtypes[train_test.dtypes == 'object'].index
 
-# ---결측치 처리
-print(train_test.isna().sum())  # --환불금액 train 2295 test 1611
-train_test['환불금액'].fillna(0, inplace=True)
+# print(train.isna().sum())
+# print(test.isna().sum())
+numeric_feature = train.dtypes[train.dtypes != "object"].index
+obj_feature = train.dtypes[train.dtypes == "object"].index
 
-# -- 스케일링
-# -----왜도가 0.75 이상인 컬럼 -->로그스케일
-skewed_feats = train_test[numeric_feats].apply(lambda x: skew(x.dropna()))
-skewed_feats = skewed_feats[skewed_feats > 3]
-skewed_feats = skewed_feats.index
+# print(train[numeric_feature].corrwith(train['환불금액']).sort_values()) 
+	#-- 환불금액은 총구매액, 최대구매액과 연관성이 높다
+# print(train['총구매액'].corr(train['최대구매액'])) 
+	#-- 총구매액과 최대구맥의 상관계수는 0.7
 
-scaler = StandardScaler()
-scaler.fit(train_test[skewed_feats])
-train_test[skewed_feats] = scaler.transform(train_test[skewed_feats])
+from sklearn.ensemble import RandomForestRegressor
+rf_reg = RandomForestRegressor()
+train_index = train.dropna().index
+rf_reg.fit(train.loc[train_index,['총구매액','최대구매액','내점일수']], train.loc[train_index,'환불금액'])
 
-# one-hot encoding
-# train_test = pd.get_dummies(train_test, prefix=obj_feats, columns=obj_feats)
+for df in [train,test]:
+	train_index = df.dropna().index
+	null_index = [i for i in df.index if i not in train_index]
 
-prod_values = train['주구매상품'].groupby(train['gender']).value_counts()[1]
-prod_keys = train['주구매상품'].groupby(train['gender']).value_counts()[1].index
-prod_dict = dict(zip(prod_keys, prod_values))
+	pred = rf_reg.predict(df.loc[null_index,['총구매액','최대구매액','내점일수']])
+	df.loc[null_index, '환불금액'] = pred
 
-train_test['주구매상품'] = train_test['주구매상품'].map(prod_dict)
-train_test['주구매상품'].fillna(0, inplace= True)
-print(train_test.isna().sum())
-train_test.drop('주구매지점', axis=1, inplace= True)
 
-# 분류 모델 적용
-test_X = train_test.iloc[len(train):, ].drop('gender', axis=1)
-X_df = train_test.iloc[:len(train), ].drop('gender', axis=1)
-y_df = train_test.iloc[:len(train), ]['gender']
+##이상치 파악하기 
+# outlier_idx = []
+# for col in ['총구매액','최대구매액']:
+# 	q1,q3 = np.percentile(train[col], [25,75])
+# 	iqr = q3 - q1
+# 	lower_bound = q1- (iqr*1.5)
+# 	upper_bound = q3+ (iqr*1.5)
+	
+# 	outlier = train[col][(train[col]<lower_bound)|(train[col]>upper_bound)].index
+# 	outlier_idx.extend(outlier)
+# 	# print(col, len(outlier_idx)) 
+# outlier_idx = set(outlier_idx)
+# print(len(outlier_idx))
 
-# 훈련데이터와 검증데이터 분리
-X_train, X_valid, y_train, y_valid = train_test_split(X_df, y_df, test_size=0.2, random_state=36, shuffle=False)
-print(X_train.shape, X_valid.shape, y_train.shape, y_valid.shape)
 
-# 모델 적용
-dt = DecisionTreeClassifier()
-rf = RandomForestClassifier()
+###왜도 파악하기 -> 높은 것은 scaling
+from scipy.stats import skew
+skewed_feature = train[numeric_feature].apply(lambda x:skew(x))
+skewed_feature = skewed_feature[abs(skewed_feature)>0.75].index
+# print(train[skewed_feature][train[skewed_feature]<0].sum())	총구매액과 최대구매액에 음수값이 있음
+
+#총구매액 minus면 모두 여자
+# minus = train[['총구매액','gender']][train['총구매액']<0]
+# print(minus)
+# minus = train[['최대구매액','gender']][train['최대구매액']<0]
+# print(minus)
+train['minus'] = train['총구매액'].apply(lambda x:5 if x<0 else 0)	
+test['minus'] = test['총구매액'].apply(lambda x:5 if x<0 else 0)	
+
+for df in [train,test]:
+	df.loc[df['총구매액']<0 ,'총구매액'] = 1
+	df.loc[df['최대구매액']<0 ,'최대구매액']=1
+
+train[skewed_feature] = np.log1p(train[skewed_feature])
+test[skewed_feature] = np.log1p(test[skewed_feature])
+	
+
+### Encoding
+# train_test = pd.concat([train,test], axis=0)
+# train_test = pd.get_dummies(train_test)
+# X = train_test.iloc[:len(train),:].drop('gender', axis=1)
+# y = train_test.iloc[:len(train),:]['gender']
+# test = train_test.iloc[len(train):,:].drop('gender', axis=1)
+
+
+for col in obj_feature:
+	col_map = train.loc[train['gender']==1, col].value_counts().to_dict()
+	train[col] = train[col].map(col_map)
+	test[col] = test[col].map(col_map)
+	train[col].fillna(0, inplace= True)
+	test[col].fillna(0, inplace= True)
+	
+X= train.drop(['gender','cust_id'], axis=1)
+y= train['gender']
+test_X = test.drop('cust_id', axis=1)
+
+
+## 모델 학습
+from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier, StackingClassifier
+from xgboost import XGBClassifier
+from sklearn.metrics import accuracy_score, roc_auc_score, confusion_matrix
+from sklearn.linear_model import LogisticRegression
+from sklearn.naive_bayes import GaussianNB
+
+X_train,X_test,y_train,y_test = train_test_split(X,y, test_size =0.1, shuffle= True, random_state= 121)
+
+svm = SVC(probability = True)
+dt  = DecisionTreeClassifier()
+rf	= RandomForestClassifier()
+xgb = XGBClassifier()
 lr = LogisticRegression()
-knn = KNeighborsClassifier()
-# svm = svm()
+gnb = GaussianNB() #0.64 
 
-models = [('DT', dt), ('RF', rf), ('LR', lr)]
 
+#cross-val-score
+# models = [svm,dt,xgb,rf, lr,gnb]
 # for model in models:
-# 	model.fit(X_train, y_train)
-# 	pred= model.predict(X_valid)
-# 	proba = model.predict_proba(X_valid)
-# 	accuracy = accuracy_score(y_valid, pred)
-# 	auc = roc_auc_score(y_valid, pred)
-# 	f1 = f1_score(y_valid, pred)
-# 	recall = recall_score(y_valid, pred)
-# 	precision =precision_score(y_valid, pred)
-# 	conf_mtx = confusion_matrix(y_valid, pred)
-# 	print(model,"-"*50)
-# 	print(accuracy, auc, f1, recall, precision)
-# 	print(conf_mtx)
+# 	score = cross_val_score(model, X,y, scoring = 'roc_auc',cv = skfold)
+# 	print(model, score.mean())
 
-# 	#cross_val_score
-# 	scores_list = cross_val_score(model, X_train, y_train, cv=5, scoring= 'roc_auc')
-# 	print(scores_list)
-# 	print(scores_list.mean())
 
+models = [gnb, lr, xgb]
+for model in models:
+	model.fit(X_train,y_train)
+	pred = model.predict(X_test)
+	proba= model.predict_proba(X_test)
+	acc = accuracy_score(y_test,pred)
+	roc = roc_auc_score(y_test, proba[:,1])
+	matrix = confusion_matrix(y_test, pred)
+	print(model, "---------------------")
+	print(acc, roc)
+	print(matrix)
+	# try:
+	# 	print(model.feature_importances_)
+	# except:
+	# 	continue
+
+
+#Stacking
+estimators = {('gnb',gnb),('DT',dt),("RF",rf)}
+Stacking = StackingClassifier(estimators = estimators, final_estimator=lr ) #0.62
+Stacking.fit(X_train,y_train)
+pred = Stacking.predict(X_test)
+proba= Stacking.predict_proba(X_test)
+acc = accuracy_score(y_test,pred)
+roc = roc_auc_score(y_test, proba[:,1])
+matrix = confusion_matrix(y_test, pred)
+print(acc, roc)
+print(matrix)
+
+#test
+sub = Stacking.predict(test_X)
+sub_df = pd.DataFrame({'cust_id':test['cust_id'],'gender':sub})
+print(sub_df.head())
+sub_df.to_csv("002001526.csv",index= False)
 
 # 초매개변수 최적화 - GridSearch CV (rf, lr)
 # ---rf
@@ -151,32 +206,3 @@ models = [('DT', dt), ('RF', rf), ('LR', lr)]
 # auc = roc_auc_score(y_valid, pred)
 # print(gcv.best_params_)#{'l1_ratio': 0, 'max_iter': 150, 'penalty': 'none'}
 # print(accuracy, auc) #.6271428571428571 0.5512579927717542
-
-# 앙상블
-vot = VotingClassifier(models)
-# vot.fit(X_train,y_train)
-# pred = vot.predict(X_valid)
-# accuracy = accuracy_score(y_valid, pred)
-# auc = roc_auc_score(y_valid, pred)
-# print(accuracy, auc)
-
-# 앙상블-초매개변수 최적화
-my_params = {'voting': ['hard', 'soft'],
-             'weights': [[2, 1, 1], [1, 1, 1], [1, 2, 1], [1, 1, 2]]}
-vot_gcv = GridSearchCV(vot, param_grid=my_params,
-                       scoring='roc_auc', refit=True, cv=5)
-vot_gcv.fit(X_train, y_train)
-pred = vot_gcv.predict(X_valid)
-proba = vot_gcv.predict_proba(X_valid)
-accuracy = accuracy_score(y_valid, pred)
-auc = roc_auc_score(y_valid, proba[:,1])
-print(accuracy, auc)
-print(vot_gcv.best_params_)
-
-# submission
-print(X_df.shape, test.shape)
-pred_test = vot_gcv.predict_proba(test_X)
-
-sub_df = pd.DataFrame({'cust_id': test['cust_id'], 'gender': pred_test[:,1]})
-print(sub_df.tail())
-sub_df.to_csv("0090.csv", index=False)
