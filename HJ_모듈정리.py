@@ -106,10 +106,39 @@ stacking.fit(X,y)
 pred= stacking.predict(test_X)
 proba = stacking.predict_proba(test_X)
 
+##회귀
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor, StackingRegressor
+from sklean.tree import DecisionTreeRegressor
+from xgboost import XGBRegressor
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
+from sklearn.metrics import mean_squared_error , mean_squared_log_error, mean_absolute_error 
+      #squared= True --> MSE, Flase-->RMSE 
 
-  
-  
-  
+###스케일링
+X = train.drop('target', axis=1)
+y = train['target']    
+      
+from sklearn.preprocessing import StandardScaler, RobustScaler, MinMaxScaler
+df = np.log1p(df) #로그 스케일 --> x,y한 번에 가능
+x_std_sclaer = StandardScaler() 
+x_rbs_scaler = RobustSclaer()
+x_MinMaxScaler= MinMaxScaler()
+
+y_std_sclaer = StandardScaler() 
+# y_rbs_scaler = RobustSclaer()
+# y_MinMaxScaler= MinMaxScaler()
+
+x_std_scaled = x_std_scaler.fit_transform(X)
+# x_rbs_scaled = x_rbs_scaler.fit_transform(X)
+# x_MinMaxScaled = x_MinMaxScaler.fit_transform(X)
+
+y_std_scaled= y_std_scaler.fit_transform(y)
+# y_rbs_scaled = y_rbs_scaler.fit_transform(y)
+# y_MinMaxScaled = y_MinMaxScaler.fit_transform(y)
+
+#model predict 한 이후에 pred값을 inverse_transform하기
+pred = model.predict(test)
+pred = y_std_scaler.inverse_transform(pred)
   
   
 
