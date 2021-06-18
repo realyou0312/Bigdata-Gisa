@@ -24,7 +24,7 @@ from sklearn.naive_bayes import GaussianNB
 from xgboost import XGBClassifier
 
 from sklearn.metrics import accuracy_score, f1_score, recall_score, precision_score, confusion_matrix, roc_auc_score
-from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold, KFold, cross_val_score
 
 X = train.drop('target',axis=1)
 y= train['target']
@@ -67,19 +67,34 @@ for model in models:
   #ovr: one vs rest
   
 #GridSearchCV -- fold를 사용하기 때문에 전체 데이터를 cv로 나눠서 학습 가능함. 
-print(model.get_params) #parameter출력
+print(model.get_params()) #parameter출력
 my_params = {}
-gcv = GridSearch(model, param_gird = my_params, scoring = 'roc_auc' ,refit= True , cv= 5) 
+skf = StratiFiedKFold(n_splits= 5, shuffle= False)
+kf = KFold(n_splits= 5, shuffle= False)
+
+gcv = GridSearchCV(model, param_gird = my_params, scoring = 'roc_auc' ,refit= True , cv= skf) #kf 
 #scoring : 'accuracy', 'f1', 'f1_macro', 'neg_log_loss', 'precision', 'recall', 'roc_auc', 'roc_auc_ovr' --분류
 #         'neg_mean_absolute_error', 'neg_mean_squared_error', 'neg_root_mean_squared_error', 'r2', 'neg_mean_squared_log_error'
-
-gcv.fit(X, y)
-gcv.score(X,y)
+gcv.fit(X, y)#주의주의
 print(gcv.best_params_)
 print(gcv.best_score_)
 
+#parameter별로 train,test의 각 split 점수 알아내기
+cv_result = pd.DataFrame(gcv.cv_results_)
+cv_result.set_index('params')
+print(cv_result.sort_values(by='rank_test_score')
+     
 pred = gcv.predict(test_X)
 prboa = gcv.predict_proba(test_X)
+
+#cross_val_score ---GridSearchCV(파라미터 튜닝)할 시간이 없다면, 점수 내기만 하자- scoring은 하나만 가능
+cv_score = cross_val_scroe(model, X,y, cv= skf, scoring= 'roc_auc')
+print(cv_score)
+print(cv_score.mean())
+      
+
+#Stacking
+from sklearn.ensemble import StackingClassifier
 
 
 
