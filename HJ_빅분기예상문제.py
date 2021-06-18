@@ -5,6 +5,8 @@ from sklearn.preprocessing import MinMaxScaler
 #데이터 불러오기
 data = pd.read_csv('data/mtcars.csv')
 data.set_index('Unnamed: 0', inplace= True)
+
+pd.set_option('display.max_columns', 400)
 #스케일링
 scaler = MinMaxScaler()
 df_scaler = scaler.fit_transform(data)
@@ -172,14 +174,9 @@ for model in models:
 # Stacking
 estimators = {('gnb', gnb), ('DT', dt), ("RF", rf)}
 Stacking = StackingClassifier(estimators=estimators, final_estimator=lr)  # 0.62
-Stacking.fit(X_train, y_train)
-pred = Stacking.predict(X_test)
-proba = Stacking.predict_proba(X_test)
-acc = accuracy_score(y_test, pred)
-roc = roc_auc_score(y_test, proba[:, 1])
-matrix = confusion_matrix(y_test, pred)
-print(acc, roc)
-print(matrix)
+cv_score = cross_val_score(Stacking, X, y, cv= skf, scoring = 'roc_auc')
+print(cv_score)
+print(cv_score.mean())
 
 
 
@@ -199,18 +196,29 @@ auc = roc_auc_score(y_test, proba[:,1])
 print(accuracy, auc) #0.6657142857142857 0.6503026463963963
 
 # -- lr
-my_param = {"penalty":['elasticnet','none'],
-						"max_iter":[100,120,150,200],
-					 "l1_ratio":[0,0.25,0.5]}
-gcv_lr = GridSearchCV(lr, param_grid = my_param, scoring='roc_auc',
-									refit =True, cv=5)
-gcv_lr.fit(X_train,y_train)
-pred= gcv_lr.predict(X_test)
-proba= gcv_lr.predict_proba(X_test)
-accuracy = accuracy_score(y_test, pred)
-auc = roc_auc_score(y_test, proba[:,1])
+# print(lr.get_params())
+# print(help(lr))
+
+lr = LogisticRegression(random_state =121)
+my_param1 = {"penalty":['elasticnet'],
+            "solver": ['saga'],
+			"max_iter":[50,100,120,150,200],
+			"l1_ratio":[0,0.25,0.5]}
+
+my_param2 = {"penalty":['l2'],
+			"max_iter":[50,100,120,150,200]}
+
+gcv_lr = GridSearchCV(lr, param_grid =my_param2, scoring='roc_auc', refit =True, cv=skf)
+gcv_lr.fit(X,y)
+
+cv_results = pd.DataFrame(gcv_lr.cv_results_, columns = ['params','mean_test_score', 'mean_train_score','split0_test_score', 'split1_test_score', 'split2_test_score', 'split3_test_score', 'split4_test_score', 'std_test_score', 'rank_test_score', 'split0_train_score', 'split1_train_score', 'split2_train_score', 'split3_train_score', 'split4_train_score'])
+cv_results.set_index('params', inplace=True)
+# print(gcv_lr.cv_results_.keys())
+print(cv_results.sort_values(by='rank_test_score'))
 print(gcv_lr.best_params_)#{'l1_ratio': 0, 'max_iter': 200, 'penalty': 'none'}
-print(accuracy, auc) #0.64 0.6479448198198198
+print(gcv_lr.best_score_)
+
+#----gnb
 
 gcv_gnb = GridSearchCV(gnb,cv=5)
 gcv_gnb.fit(X_train,y_train)
