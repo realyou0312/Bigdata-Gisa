@@ -66,8 +66,10 @@ for model in models:
   #ovo: one vs one
   #ovr: one vs rest
   
-#GridSearchCV -- fold를 사용하기 때문에 전체 데이터를 cv로 나눠서 학습 가능함. 
+### GridSearchCV -- fold를 사용하기 때문에 전체 데이터를 cv로 나눠서 학습 가능함. 
 print(model.get_params()) #parameter출력
+print(help(model)) #model 설명- parameter에 넣을 변수 검색
+
 my_params = {}
 skf = StratiFiedKFold(n_splits= 5, shuffle= False)
 kf = KFold(n_splits= 5, shuffle= False)
@@ -87,15 +89,22 @@ print(cv_result.sort_values(by='rank_test_score')
 pred = gcv.predict(test_X)
 prboa = gcv.predict_proba(test_X)
 
-#cross_val_score ---GridSearchCV(파라미터 튜닝)할 시간이 없다면, 점수 내기만 하자- scoring은 하나만 가능
+### cross_val_score ---GridSearchCV(파라미터 튜닝)할 시간이 없다면, 점수 내기만 하자- scoring은 하나만 가능
 cv_score = cross_val_scroe(model, X,y, cv= skf, scoring= 'roc_auc')
 print(cv_score)
 print(cv_score.mean())
       
 
-#Stacking
+### Stacking
 from sklearn.ensemble import StackingClassifier
 
+models = {('rf',rf), ('lr',lr), ('gnb', gnb)}
+stacking = StackingClassifier(estimators =models, final_estimator = xgb)
+cross_val_score(stacking, X, y, cv = skf, scoring = 'roc_auc')
+
+stacking.fit(X,y)
+pred= stacking.predict(test_X)
+proba = stacking.predict_proba(test_X)
 
 
   
