@@ -222,7 +222,7 @@ print(gcv_gnb.best_params_)
 print(accuracy, auc)
 
 # test
-sub = gcv_rf.predict(test_X)
+sub = gcv_rf.predict_proba(test_X)
 sub_df = pd.DataFrame({'cust_id': test['cust_id'], 'gender': sub})
 print(sub_df.head())
 sub_df.to_csv("002001526.csv", index=False)
